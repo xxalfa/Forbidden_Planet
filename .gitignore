@@ -10,6 +10,7 @@
 !.vscode/extensions.json
 
 # Ignore the server-settings.json file
+/auth.json
 /server-settings.json
 /dev-server-settings.json
 /server/auth.json
