@@ -21,314 +21,311 @@
     // TABLES
     //-------------------------------------------------
 
+    const table_of_ranks = [ 'Administrator', 'Moderator', 'Trusted', 'Everyone' ];
+
+    const table_of_images = [ 'factoriotools/factorio' ];
+
+    const table_of_scenarios = [ 'scenario-one', 'scenario-two' ];
+
+    const table_of_containers = [];
+
     const table_of_stages = {};
 
-    table_of_stages.start = `Server was **Started** by __USER__`;
+    table_of_stages.start = 'Server was **Started** by __USER__.';
 
-    table_of_stages.stop = `Server was **Stopped** by __USER__`;
+    table_of_stages.update = 'Server was **Updated** to __VERSION__ by __USER__.';
 
-    table_of_stages.restart = `Server was **Restarted** by __USER__`;
+    table_of_stages.restart = 'Server was **Restarted** by __USER__.';
 
-    table_of_stages.update = `Server was **Updated** to __VERSION__ by __USER__`;
+    table_of_stages.stop = 'Server was **Stopped** by __USER__.';
 
-    table_of_stages.online = `Players **Online** __ONLINE__`;
+    table_of_stages.online = 'Players **Online** __ONLINE__.';
 
-    table_of_stages.error = `\`\`\`__ERROR__\`\`\``;
+    table_of_stages.error = '```__ERROR__```';
 
     const table_of_commands = {};
 
-    table_of_commands.start = { parameters: '*<**new** | **latest**>* *default:* **latest**', information: 'starts the server', usage: '!start latest', permissions: '@Trusted' };
+    table_of_commands.server = { parameters: '', information: 'Displays the hardware information.', usage: '!info', permissions: '@Everyone' };
 
-    table_of_commands.stop = { parameters: '', information: 'stops the server', usage: '!stop', permissions: '@Moderator' };
+    table_of_commands.list = { parameters: '', information: 'Displays all running servers.', usage: '!list', permissions: '@Everyone' };
 
-    table_of_commands.restart = { parameters: '*<**new** | **latest**>* *default:* **latest**', information: 'restarts the server', usage: '!restart', permissions: '@Moderator' };
+    table_of_commands.status = { parameters: '*<**pid**>*', information: 'Displays the version, game tick, map name and the number of players (online/offline).', usage: '!status <pid>', permissions: '@Everyone' };
 
-    table_of_commands.online = { parameters: '', information: 'Logs the current online player count', usage: '!online', permissions: '@Everyone' };
+    table_of_commands.online = { parameters: '*<**pid**>*', information: 'Displays the current number of online players.', usage: '!online <pid>', permissions: '@Everyone' };
 
-    table_of_commands.server = { parameters: '', information: 'List server information', usage: '!server', permissions: '@Everyone' };
+    table_of_commands.start = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Starts the server.', usage: '!start <all|pid>', permissions: '@Moderator' };
 
-    table_of_commands.kick = { parameters: '*<**name**>*', information: 'Kicks a player from the server', usage: '!kick Banana', permissions: '@Moderator' };
+    table_of_commands.restart = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Restarts the server.', usage: '!restart <all|pid>', permissions: '@Moderator' };
 
-    table_of_commands.ban = { parameters: '*<**name**>*', information: 'Bans a player from the server', usage: '!ban Banana', permissions: '@Moderator' };
+    table_of_commands.stop = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Stops the server.', usage: '!stop <all|pid>', permissions: '@Moderator' };
 
-    table_of_commands.unban = { parameters: '*<**name**>*', information: 'Un-bans a player from the server', usage: '!unban Banana', permissions: '@Moderator' };
+    table_of_commands.kick = { parameters: '*<**name**> <**reason**>*', information: 'Kicks a player from the server.', usage: '!kick <name> <reason>', permissions: '@Moderator' };
 
-    table_of_commands.promote = { parameters: '*<**name**>*', information: 'Promotes a in-game player to *Admin*', usage: '!promote Banana', permissions: '@Administrator' };
+    table_of_commands.ban = { parameters: '*<**name**> <**reason**>*', information: 'Bans a player from the server.', usage: '!ban <name> <reason>', permissions: '@Moderator' };
 
-    table_of_commands.demote = { parameters: '*<**name**>*', information: 'Demotes a in-game player', usage: '!demote Banana', permissions: '@Administrator' };
+    table_of_commands.unban = { parameters: '*<**name**>*', information: 'Un-bans a player from the server.', usage: '!unban <name>', permissions: '@Moderator' };
 
-    const table_of_ranks = [ 'Administrator', 'Moderator', 'Trusted', 'Everyone' ];
+    table_of_commands.promote = { parameters: '*<**name**>*', information: 'Promotes a in-game player to administrator.', usage: '!promote <name>', permissions: '@Administrator' };
+
+    table_of_commands.demote = { parameters: '*<**name**>*', information: 'Demotes a in-game player.', usage: '!demote <name>', permissions: '@Administrator' };
 
     //-------------------------------------------------
-    // CLASS EVENT
+    // CLASS SCRIPT EVENT
     //-------------------------------------------------
 
-    class Event
+    class ScriptEvent
     {
         constructor()
         {
-            this.events = {};
+            this.table_of_events = {};
         }
 
         register( name, callback )
         {
-            this.events[ name ] = callback;
+            this.table_of_events[ name ] = callback;
         }
 
-        trigger( name )
+        trigger( name, value )
         {
-            console.log( `trigger: ${name}` );
+            console.log( 'trigger ->', name + ( ( value == undefined ) ? '' : ' -> ' + value.toString() ) );
 
-            if ( this.events[ name ] )
+            if ( this.table_of_events[ name ] )
             {
-                this.events[ name ]();
+                this.table_of_events[ name ]( value );
             }
         }
     }
 
-    const event = new Event();
+    const script = { event: new ScriptEvent() };
 
     //-------------------------------------------------
     // CLASS FACTORIO SERVER
     //-------------------------------------------------
 
-    class FactorioServer
+    for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
     {
-        constructor( opts )
+        if ( typeof table_of_containers[ key ] == 'undefined' )
         {
-            this.process = undefined;
+            const container = spawn( 'docker', [ 'run', '--rm', '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', '--attach', 'stdout', 'factoriotools/factorio', 'ComfyFactorio' ] );
 
-            this._online = false;
+            script.event.trigger( 'event_on_process_started', process.pid + ' -> container -> ' + value + ' -> ' + container.pid );
 
-            const table_of_objects = {};
+            table_of_containers[ key ] = { process: container, uptime: 0, version: 0, players: 0 };
 
-            table_of_objects.launch = {};
+            table_of_containers[ key ].process.stdout.on( 'data', event_on_container_data );
 
-            table_of_objects.launch.path = '/opt/factorio/bin/x64/factorio';
+            table_of_containers[ key ].process.stderr.on( 'data', event_on_container_error );
 
-            table_of_objects.launch.latest = '--start-server-load-latest';
+            table_of_containers[ key ].process.on( 'error', event_on_container_error );
 
-            table_of_objects.launch.new = '--start-server-load-scenario';
-
-            table_of_objects.launch.name = 'ComfyFactorio';
-
-            table_of_objects.launch.config = '/opt/factorio/config/server-settings.json';
-
-            this.options = Object.assign( table_of_objects, opts );
-        }
-
-        start( parameter = 'latest' )
-        {
-            return new Promise( ( resolve, reject ) =>
-            {
-                if ( parameter == false )
-                {
-                    reject( 'no start parameter' );
-                }
-
-                const { options } = this;
-
-                if ( parameter == 'new' )
-                {
-                    this.process = spawn( options.launch.path, [ options.launch.new, options.launch.name, '--server-settings', options.launch.config ] );
-
-                    this._set_triggers( this.process );
-                }
-                else if ( parameter == 'latest' )
-                {
-                    this.process = spawn( options.launch.path, [ options.launch.latest, '--server-settings', options.launch.config ] );
-
-                    this._set_triggers( this.process );
-                }
-                else
-                {
-                    reject( 'unknown parameter' );
-                }
-
-                resolve( 'started' );
-
-            } )
-        }
-
-        stop()
-        {
-            return new Promise( ( resolve, reject ) =>
-            {
-                if ( this.process == false )
-                {
-                    message_embedded( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-
-                    reject( 'server not running' );
-
-                    return;
-                }
-
-                this.process.kill( 'SIGHUP' );
-
-                resolve( 'stopped' );
-
-            } )
-        }
-
-        online_players()
-        {
-            if ( this.process == false )
-            {
-                return;
-            }
-
-            this.process.stdin.write( `/silent-command log( "[ONLINE] " .. #game.connected_players )\n` );
-        }
-
-        restart()
-        {
-
-        }
-
-        message( user, text )
-        {
-            if ( this.process == false )
-            {
-                return;
-            }
-
-            this.process.stdin.write( `/silent-command game.print( "[Discord] ${user}: ${text}", { r = 0.4, g = 0.6, b = 1 } )\n` );
-        }
-
-        set online( o )
-        {
-            this._online = o;
-        }
-
-        get online()
-        {
-            return this._online;
-        }
-
-        _set_triggers( factorio_server_process )
-        {
-            factorio_server_process.stdout.on( 'data', data =>
-            {
-                console.log( `${data}` );
-
-                // const error_filter = /.*Error(.*)/;
-
-                // const error = error_filter.exec( `${data}` );
-
-                // const started = /.*ServerMultiplayerManager.cpp:705: Matching server connection resumed.*/;
-
-                // const message_filter = /.*\[CHAT\]\s?(.*)/;
-
-                // const online_players_filter = /.*Script log.*\[ONLINE\]\s?(\d+)/;
-
-                // const join_filter = /.*\[JOIN\]\s?(.*)/;
-
-                // const leave_filter = /.*\[LEAVE\]\s?(.*)/;
-
-                // const join = join_filter.exec( `${data}` );
-
-                // const leave = leave_filter.exec( `${data}` );
-
-                // const message = message_filter.exec( `${data}` );
-
-                // const online = online_players_filter.exec( `${data}` );
-
-                // if ( error )
-                // {
-                //     message_embedded( 'bananas', 'Error', table_of_stages.error.replace( '__ERROR__', error[ 1 ] ), 0xff0000 );
-                // }
-
-                // if ( started.test( data ) )
-                // {
-                //     event.trigger( 'started' );
-
-                //     factorio.server.online = true;
-                // }
-
-                // if ( join )
-                // {
-                //     const user = join[ 1 ].split( ' ' )[ 0 ];
-
-                //     join_or_leave_message( 'bananas', user, 'joined' );
-                // }
-                // else if ( leave )
-                // {
-                //     const user = leave[ 1 ].split( ' ' )[ 0 ];
-
-                //     join_or_leave_message( 'bananas', user, 'left' );
-                // }
-                // else if ( message )
-                // {
-                //     const data = message[ 1 ].split( ' ' );
-
-                //     const user = data[ 0 ];
-
-                //     const text = data.slice( 1, data.length );
-
-                //     chat_message( 'bananas', user, text.join( ' ' ) );
-                // }
-                // else if ( online )
-                // {
-                //     message_embedded( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', online[ 1 ] ), 0x0000ff );
-                // }
-
-            } )
-
-            factorio_server_process.on( 'close', ( code ) =>
-            {
-                event.trigger( 'stop' );
-
-                factorio.server.online = false;
-
-            } );
-
-            factorio_server_process.on( 'error', ( err ) =>
-            {
-                console.log( 'Failed to start sub_process.' );
-
-            } );
-
-            process.on( 'SIGINT', async () =>
-            {
-                console.log( 'Caught interrupt signal.' );
-
-                factorio_server_process.kill( 'SIGHUP' );
-
-                this.process = undefined;
-
-                setTimeout( () => process.exit(), 1000 );
-
-            } );
-
+            table_of_containers[ key ].process.on( 'close', event_on_container_close );
         }
     }
 
-    const factorio = { server: new FactorioServer() };
+    process.on( 'SIGINT', event_on_terminal_sigint );
 
-    factorio.server.start( 'new' );
-
-    //-------------------------------------------------
-    // DISCORD CLIENT ON MESSAGE
-    //-------------------------------------------------
-
-    discord.client.on( 'message', async message =>
+    function event_on_container_data( event )
     {
-        if ( message.author.bot )
+        const content = event.toString().replace( /\n\s+/g, '\n' ).trim();
+
+        console.log( content );
+
+        const version = /.*Factorio\s(.*)\s\((build.*)\).*/.exec( content );
+
+        if ( version )
+        {
+            script.event.trigger( 'event_on_container_version', version[ 1 ] + ' -> ' + version[ 2 ] );
+        }
+
+        const online = /.*Matching server connection resumed.*/.test( content );
+
+        if ( online )
+        {
+            script.event.trigger( 'event_on_container_online' );
+        }
+
+        const error = /.*(Error\s.*)/.exec( content );
+
+        if ( error )
+        {
+            script.event.trigger( 'event_on_container_error', error[ 1 ] );
+
+            // discord_embedded_message( 'bananas', 'Error', table_of_stages.error.replace( '__ERROR__', error[ 1 ] ), 0xff0000 );
+        }
+
+        const join = /.*\[JOIN\]\s?(.*)/.exec( content );
+
+        if ( join )
+        {
+            const name = join[ 1 ].split( ' ' )[ 0 ];
+
+            script.event.trigger( 'event_on_container_join', name );
+
+            // join_or_leave_message( 'bananas', name, 'joined' );
+        }
+
+        const leave = /.*\[LEAVE\]\s?(.*)/.exec( content );
+
+        if ( leave )
+        {
+            const name = leave[ 1 ].split( ' ' )[ 0 ];
+
+            script.event.trigger( 'event_on_container_leave', name );
+
+            // join_or_leave_message( 'bananas', name, 'left' );
+        }
+
+        // const message = /.*\[CHAT\]\s?(.*)/.exec( content );
+
+        // if ( message )
+        // {
+        //     const data = message[ 1 ].split( ' ' );
+
+        //     const user = data[ 0 ];
+
+        //     const text = data.slice( 1, data.length );
+
+        //     chat_message( 'bananas', user, text.join( ' ' ) );
+        // }
+
+        // const number_of_players = /.*Script log.*\[ONLINE\]\s?(\d+)/.exec( content );
+
+        // if ( number_of_players )
+        // {
+        //     discord_embedded_message( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', number_of_players[ 1 ] ), 0x0000ff );
+        // }
+    }
+
+    // function event_on_container_chat( name, message )
+    // {
+    //     if ( this.child.process != false )
+    //     {
+    //         this.child.process.stdin.write( "/silent-command game.print( '[Discord] " + name + ": " + message + "', { r = 0.4, g = 0.6, b = 1, a = 1 } )\n" );
+    //     }
+    // }
+
+    // function event_on_container_status()
+    // {
+    //     if ( this.child.process == false )
+    //     {
+    //         discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
+    //     }
+    //     else
+    //     {
+    //         this.child.process.stdin.write( "/silent-command log( '[ONLINE] ' .. #game.connected_players )\n" );
+    //     }
+    // }
+
+    // script.event.register( 'event_on_container_status', event_on_container_status );
+
+    // function event_on_container_version()
+    // {
+    //     if ( this.child.process != false )
+    //     {
+    //         this.child.process.stdin.write( "/version\n" );
+    //     }
+    // }
+
+    // script.event.register( 'event_on_container_version', event_on_container_version );
+
+    // function event_on_container_restart()
+    // {
+
+    // }
+
+    // script.event.register( 'event_on_container_restart', event_on_container_restart );
+
+    // function event_on_container_start( event )
+    // {
+
+    // }
+
+    // script.event.register( 'event_on_container_start', event_on_container_start );
+
+    function event_on_container_online( event )
+    {
+
+    }
+
+    script.event.register( 'event_on_container_online', event_on_container_online );
+
+    // function event_on_container_stop( event )
+    // {
+    //     if ( this.child.process == false )
+    //     {
+    //         discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
+    //     }
+    //     else
+    //     {
+    //         this.child.process.kill( 'SIGTERM' );
+
+    //         this.child.process = undefined;
+    //     }
+    // }
+
+    // script.event.register( 'event_on_container_stop', event_on_container_stop );
+
+    function event_on_container_error( event )
+    {
+        script.event.trigger( 'event_on_container_error', event.toString().trim() );
+    }
+
+    function event_on_container_close( event )
+    {
+        script.event.trigger( 'event_on_container_close' );
+    }
+
+    function event_on_terminal_sigint( event )
+    {
+        for ( let [ key, value ] of Object.entries( table_of_containers ) )
+        {
+            table_of_containers[ key ].process.kill( 'SIGTERM' );
+
+            table_of_containers[ key ] = undefined;
+        }
+    }
+
+    //-------------------------------------------------
+    // CLASS FACTORIO SERVER
+    //-------------------------------------------------
+
+    // const sleep = require( 'sleep' );
+
+    // while ( true )
+    // {
+    //     if ( factorio.server.online )
+    //     {
+    //         console.log( 'Server is running.' );
+    //     }
+    //     else
+    //     {
+    //         console.log( 'Server is not running.' );
+    //     }
+
+    //     sleep.sleep( 1 );
+    // }
+
+    // if ( process.argv[ 2 ] === 'child' )
+    // {
+    //     const child = spawn( 'ls' );
+
+    //     child.stdout.pipe( process.stdout );
+    // }
+    // else
+    // {
+    //     const child = spawn( process.execPath, [ __filename, 'child' ] );
+    // }
+
+    //-------------------------------------------------
+    // EVENT DISCORD CLIENT ON MESSAGE
+    //-------------------------------------------------
+
+    discord.client.on( 'message', async( message ) =>
+    {
+        if ( message.author.bot || message.type != 'DEFAULT' || message.channel.name !== 'bananas' )
         {
             return;
         }
-
-        if ( message.type != 'DEFAULT' )
-        {
-            return;
-        }
-
-        if ( message.channel.name !== 'bananas' )
-        {
-            return;
-        }
-
-        const message_author = message.author.username
 
         if ( message.content.startsWith( '!' ) )
         {
@@ -337,51 +334,56 @@
                 return;
             }
 
-            if ( message.content.startsWith( '!help' ) )
-            {
-                print_help( 'bananas' );
-            }
-
-            if ( message.content.startsWith( '!server' ) )
-            {
-                message_embedded( 'bananas', 'Server Info', `3 Cores @ 3,90 GHz\n8 GB RAM\n**OS** Linux` );
-            }
-
             const parameter = message.content.split( /\s/g )[ 1 ];
 
-            if ( message.content.startsWith( '!online' ) )
+            if ( message.content.startsWith( '!help' ) )
             {
-                factorio.server.online_players();
+                // print_help( 'bananas' );
+            }
+            else if ( message.content.startsWith( '!info' ) )
+            {
+                // discord_embedded_message( 'bananas', 'Hardware Information', '3 Cores @ 3,90 GHz -- 8 GByte RAM -- **OS** Linux' );
+            }
+            else if ( message.content.startsWith( '!status' ) )
+            {
+                // if ( factorio.server.online )
+                // {
+                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently running.', 0x00ff00 );
+                // }
+                // else
+                // {
+                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently not running.', 0xff0000 );
+                // }
             }
             else if ( message.content.startsWith( '!start' ) )
             {
-                if ( factorio.server.online )
-                {
-                    message_embedded( 'bananas', 'Error', 'Server is currently running', 0xff0000 );
-                }
-                else
-                {
-                    event.register( 'started', () => { message_embedded( 'bananas', 'Status', table_of_stages.start.replace( '__USER__', message_author ), 0x00ff00 ) } );
+                // if ( factorio.server.online )
+                // {
+                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently running.', 0xff0000 );
+                // }
+                // else
+                // {
+                //     script.event.register( 'event_on_process_started', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.start.replace( '__USER__', message.author.username ), 0x00ff00 ) } );
 
-                    await factorio.server.start( 'new' );
-                }
+                //     await factorio.server.start( 'new' );
+                // }
             }
             else if ( message.content.startsWith( '!stop' ) )
             {
-                if ( factorio.server.online == false )
-                {
-                    message_embedded( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-                }
-                else
-                {
-                    await factorio.server.stop();
+                // if ( factorio.server.online )
+                // {
+                //     script.event.register( 'event_on_process_stopped', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.stop.replace( '__USER__', message.author.username ), 0xff0000 ) } );
 
-                    event.register( 'stop', () => { message_embedded( 'bananas', 'Status', table_of_stages.stop.replace( '__USER__', message_author ), 0xff0000 ) } );
-                }
+                //     await factorio.server.stop();
+                // }
+                // else
+                // {
+                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently not running.', 0xff0000 );
+                // }
             }
             else if ( message.content.startsWith( '!restart' ) )
             {
-                message_embedded( 'bananas', 'Status', table_of_stages.restart.replace( '__USER__', message_author ), 0xffff00 );
+
             }
             else if ( message.content.startsWith( '!kick' ) )
             {
@@ -406,14 +408,12 @@
         }
         else
         {
-            if ( factorio.server.online == false )
-            {
-                return;
-            }
+            // if ( factorio.server.online )
+            // {
+            //     const content = escape_string( message.cleanContent );
 
-            const text = escape_string( message.cleanContent );
-
-            factorio.server.message( message.author.username, text );
+            //     factorio.server.on_console_chat( message.author.username, content );
+            // }
         }
 
     } );
@@ -422,7 +422,7 @@
     // CODE
     //-------------------------------------------------
 
-    const escape_string = message =>
+    const escape_string = ( message ) =>
     {
         let escaped = message.replace( /\n/g, '' );
 
@@ -448,49 +448,47 @@
         */
     }
 
-    const message_embedded = ( channel_name, title, message, color = 0xff0000 ) =>
+    const discord_embedded_message = ( channel_name, title, message, color = 0xff0000 ) =>
     {
-        const bananas = discord.client.channels.find( channel => channel.name === channel_name );
+        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
 
         if ( bananas == false )
         {
             return;
         }
 
-        const embed = new RichEmbed().setTimestamp().setTitle( `**${title}**` ).setColor( color ).setDescription( message );
+        const embed = new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message );
 
         bananas.send( embed );
     }
 
     const join_or_leave_message = ( channel_name, user, join_or_leave ) =>
     {
-        const bananas = discord.client.channels.find( channel => channel.name === channel_name );
+        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
 
         if ( bananas == false )
         {
             return;
         }
 
-        bananas.send( `**⟶ ${user} ${join_or_leave} the server ⟵**` );
+        bananas.send( '**⟶ ' + user + ' ' + join_or_leave + ' the server ⟵**' );
     }
 
     const chat_message = ( channel_name, user, message ) =>
     {
-        const bananas = discord.client.channels.find( channel => channel.name === channel_name );
+        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
 
         if ( bananas == false )
         {
             return;
         }
 
-        const msg = `**${user}** *${message}*`;
-
-        bananas.send( msg );
+        bananas.send( '**' + user + '** *' + message + '*' );
     }
 
     const print_help = ( channel_name ) =>
     {
-        const bananas = discord.client.channels.find( channel => channel.name === channel_name );
+        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
 
         if ( bananas == false )
         {
@@ -501,30 +499,8 @@
 
         for ( let [ name, value ] of Object.entries( table_of_commands ) )
         {
-            string += `**!${name}** ${value.parameters}\n\t↳ ${value.information}\n\t↳ Usage: \`${value.usage}\`\n↳Permissions: **${value.permissions}**\n\n`;
+            string += '**!' + name + '** ' + value.parameters + '\n\t↳ ' + value.information + '\n\t↳ Usage: `' + value.usage + '`\n↳Permissions: **' + value.permissions + '**\n\n';
         }
 
-        message_embedded( 'bananas', 'Commands', string, 0xaa55ff );
+        discord_embedded_message( channel_name, 'Commands', string, 0xaa55ff );
     }
-
-    /*
-
-    setTimeout( () =>
-    {
-        message_embedded("announcements",table_of_stages.start.replace('__USER__', 'Decu'), 0x00ff00);
-
-        message_embedded("announcements",table_of_stages.stop.replace('__USER__', 'Decu'), 0xff0000);
-
-        message_embedded("announcements",table_of_stages.restart.replace('__USER__', 'Decu'), 0xffff00);
-
-        message_embedded("announcements",table_of_stages.update.replace('__USER__', 'Decu').replace('__VERSION__', '*0.17.49*'), 0xff00ff);
-
-        message_embedded("announcements",table_of_stages.online.replace('__ONLINE__', 12), 0x0000ff);
-
-    }, 1000 )
-
-    setInterval(() => join_or_leave_message("bananas"), 5000);
-
-    setInterval(() => chat_message("bananas"), 2500);
-
-    */
