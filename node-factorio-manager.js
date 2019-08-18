@@ -33,9 +33,9 @@
 
     // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined };
 
-    table_of_scenarios[ 0 ] = { community: 'AAA', scenario: 'BBB', description: 'CCC', tags: undefined };
+    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined };
 
-    // table_of_scenarios[ 1 ] = { community: 'DDD', scenario: 'EEE', description: 'FFF', tags: undefined };
+    // table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined };
 
     const table_of_containers = [];
 
@@ -114,11 +114,13 @@
 
     for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
     {
-        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdout', '--attach', 'stderr', '--env', 'INSTANCE_NAME=' + value.community + ' ' + value.scenario, '--env', 'INSTANCE_DESC=' + value.description, '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', 'factoriotools/factorio', 'ComfyFactorio' ] );
+        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdout', '--attach', 'stderr', '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', 'factoriotools/factorio', 'ComfyFactorio' ] );
 
-        script.event.trigger( 'event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.scenario );
+        script.event.trigger( 'event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
 
-        table_of_containers[ container.pid ] = { process: container, instance: key, online: false, version: undefined, uptime: 0, number_of_connected_players: 0 };
+        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, number_of_connected_players: 0 };
+
+        table_of_containers[ container.pid ].process.stdin.setEncoding( 'utf8' );
 
         table_of_containers[ container.pid ].process.stdout.setEncoding( 'utf8' );
 
@@ -139,7 +141,7 @@
 
         console.log( pid + ' -> ' + content );
 
-        const uptime = /^(\d+)\.\d{3}.*/.exec( content );
+        const uptime = /^(\d+\.\d{3}).*/.exec( content );
 
         if ( uptime )
         {
@@ -157,22 +159,19 @@
             return;
         }
 
-        const join_or_leave = /.*\[(JOIN|LEAVE)\]\s(.*)/.exec( content );
+        const join_or_leave = /.*\[PLAYER-(JOIN|LEAVE)\](.*)$/.exec( content );
 
         if ( join_or_leave )
         {
-            script.event.trigger( 'event_on_container_join_or_leave', [ pid, join_or_leave[ 2 ] ] );
+            if ( join_or_leave[ 1 ] == 'JOIN' )
+            {
+                table_of_containers[ pid ].number_of_connected_players += 1;
+            }
 
-            return;
-        }
-
-        const number_of_connected_players = /.*Script\slog.*\[ONLINE\]\s(\d+)/.exec( content );
-
-        if ( number_of_connected_players )
-        {
-            table_of_containers[ pid ].number_of_connected_players = number_of_connected_players[ 1 ];
-
-            // discord_embedded_message( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', number_of_connected_players[ 1 ] ), 0x0000ff );
+            if ( join_or_leave[ 1 ] == 'LEAVE' )
+            {
+                table_of_containers[ pid ].number_of_connected_players -= 1;
+            }
 
             return;
         }
@@ -185,6 +184,12 @@
             {
                 table_of_containers[ pid ].version = version[ 1 ];
 
+                // const scenario = table_of_containers[ pid ].scenario;
+
+                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + '"' );
+
+                // table_of_containers[ pid ].process.stdin.write( '/config set description "' + table_of_scenarios[ scenario ].description + '"' );
+
                 return;
             }
         }
@@ -195,7 +200,9 @@
 
             if ( online )
             {
-                script.event.trigger( 'event_on_container_online', pid );
+                const scenario = table_of_containers[ pid ].scenario;
+
+                script.event.trigger( 'event_on_container_online', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name );
 
                 table_of_containers[ pid ].online = true;
 
@@ -219,13 +226,11 @@
     {
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
-            // if ( argv[ 0 ] != key && table_of_containers[ key ].online )
-
-            if ( table_of_containers[ key ].online )
+            if ( argv[ 0 ] != key && table_of_containers[ key ].online )
             {
-                const instance = table_of_containers[ key ].instance;
+                const scenario = table_of_containers[ key ].scenario;
 
-                table_of_containers[ key ].process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ instance ].scenario + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 255, g = 255, b = 255, a = 1 } )\n" );
+                table_of_containers[ key ].process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 255, g = 255, b = 255, a = 1 } )\n" );
             }
         }
     }
@@ -234,16 +239,18 @@
 
     function event_on_container_status( pid )
     {
-        if ( typeof table_of_containers[ pid ] != 'undefined' )
+        if ( typeof table_of_containers[ pid ] == 'undefined' )
         {
-            if ( table_of_containers[ pid ].online == true )
-            {
-                table_of_containers[ pid ].process.stdin.write( "/silent-command log( '[ONLINE] ' .. #game.connected_players )\n" );
-            }
-            else
-            {
-                // discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-            }
+            return;
+        }
+
+        if ( table_of_containers[ pid ].online == true )
+        {
+            // discord_embedded_message( 'bananas', 'Error', 'Server is currently running', 0x00ff00 );
+        }
+        else
+        {
+            // discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
         }
     }
 
@@ -369,6 +376,8 @@
             }
             else if ( message.content.startsWith( '!status' ) )
             {
+                // discord_embedded_message( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', number_of_connected_players[ 1 ] ), 0x0000ff );
+
                 // script.event.trigger( 'event_on_container_status', pid );
 
                 // if ( factorio.server.online )
