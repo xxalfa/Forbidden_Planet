@@ -95,13 +95,20 @@
             this.table_of_events[ name ] = callback;
         }
 
-        trigger( name, value )
+        trigger( name )
         {
-            console.log( 'trigger ->', name + ( ( value == undefined ) ? '' : ' -> ' + value.toString() ) );
+            let argument = '';
+
+            for ( let index = 1; index < arguments.length; index++ )
+            {
+                argument = argument + arguments[ index ];
+            }
+
+            console.log( 'trigger -> ' + name + ' -> ' + argument );
 
             if ( this.table_of_events[ name ] )
             {
-                this.table_of_events[ name ]( value );
+                this.table_of_events[ name ]( arguments );
             }
         }
     }
@@ -112,13 +119,15 @@
     // CLASS FACTORIO SERVER
     //-------------------------------------------------
 
-    for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
+    function docker_run_container( key, value )
     {
-        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdout', '--attach', 'stderr', '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', 'factoriotools/factorio', 'ComfyFactorio' ] );
+        // const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdin', '--attach', 'stdout', '--attach', 'stderr', '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', 'factoriotools/factorio', 'ComfyFactorio' ] );
 
-        script.event.trigger( 'event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
+        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdin', '--attach', 'stdout', '--attach', 'stderr', 'factoriotools/factorio' ] );
 
-        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, number_of_connected_players: 0 };
+        script.event.trigger( 'script_event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
+
+        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, activity: 0, number_of_connected_players: 0 };
 
         table_of_containers[ container.pid ].process.stdin.setEncoding( 'utf8' );
 
@@ -126,16 +135,21 @@
 
         table_of_containers[ container.pid ].process.stderr.setEncoding( 'utf8' );
 
-        table_of_containers[ container.pid ].process.stdout.on( 'data', ( data ) => { event_on_container_data( container.pid, data ) } );
+        table_of_containers[ container.pid ].process.stdout.on( 'data', ( data ) => { handle_on_container_data( container.pid, data ) } );
 
-        table_of_containers[ container.pid ].process.stderr.on( 'data', ( data ) => { event_on_container_error( container.pid, data ) } );
+        table_of_containers[ container.pid ].process.stderr.on( 'data', ( data ) => { handle_on_container_error( container.pid, data ) } );
 
-        table_of_containers[ container.pid ].process.on( 'error', ( error ) => { event_on_container_error( container.pid, error ) } );
+        table_of_containers[ container.pid ].process.on( 'error', ( error ) => { handle_on_container_error( container.pid, error ) } );
 
-        table_of_containers[ container.pid ].process.on( 'close', ( close ) => { event_on_container_close( container.pid, close ) } );
+        table_of_containers[ container.pid ].process.on( 'close', ( close ) => { handle_on_container_close( container.pid, close ) } );
     }
 
-    function event_on_container_data( pid, data )
+    for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
+    {
+        docker_run_container( key, value );
+    }
+
+    function handle_on_container_data( pid, data )
     {
         const content = data.toString().replace( /\n\s+/g, '\n' ).trim();
 
@@ -146,13 +160,15 @@
         if ( uptime )
         {
             table_of_containers[ pid ].uptime = uptime[ 1 ];
+
+            table_of_containers[ pid ].activity = Math.floor( Date.now() / 1000 );
         }
 
         const chat = /.*\[CHAT\]\s(.*):\s(.*)/.exec( content );
 
         if ( chat )
         {
-            script.event.trigger( 'event_on_container_chat', [ pid, chat[ 1 ], chat[ 2 ] ] );
+            script.event.trigger( 'script_event_on_container_chat', [ pid, chat[ 1 ], chat[ 2 ] ] );
 
             // discord_on_chat( 'bananas', chat[ 1 ], chat[ 2 ] );
 
@@ -184,12 +200,6 @@
             {
                 table_of_containers[ pid ].version = version[ 1 ];
 
-                // const scenario = table_of_containers[ pid ].scenario;
-
-                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + '"' );
-
-                // table_of_containers[ pid ].process.stdin.write( '/config set description "' + table_of_scenarios[ scenario ].description + '"' );
-
                 return;
             }
         }
@@ -202,9 +212,13 @@
             {
                 const scenario = table_of_containers[ pid ].scenario;
 
-                script.event.trigger( 'event_on_container_online', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name );
+                script.event.trigger( 'script_event_on_container_online', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name );
 
                 table_of_containers[ pid ].online = true;
+
+                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + '"' );
+
+                // table_of_containers[ pid ].process.stdin.write( '/config set description "' + table_of_scenarios[ scenario ].description + '"' );
 
                 return;
             }
@@ -214,7 +228,7 @@
 
         if ( error )
         {
-            script.event.trigger( 'event_on_container_error', pid + ' -> ' + error[ 1 ] );
+            script.event.trigger( 'script_event_on_container_error', pid + ' -> ' + error[ 1 ] );
 
             // discord_embedded_message( 'bananas', 'Error', table_of_stages.error.replace( '__ERROR__', error[ 1 ] ), 0xff0000 );
 
@@ -222,7 +236,7 @@
         }
     }
 
-    function event_on_container_chat( argv )
+    function script_event_on_container_chat( argv )
     {
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
@@ -235,9 +249,9 @@
         }
     }
 
-    script.event.register( 'event_on_container_chat', event_on_container_chat );
+    script.event.register( 'script_event_on_container_chat', script_event_on_container_chat );
 
-    function event_on_container_status( pid )
+    function script_event_on_container_status( pid )
     {
         if ( typeof table_of_containers[ pid ] == 'undefined' )
         {
@@ -254,103 +268,92 @@
         }
     }
 
-    script.event.register( 'event_on_container_status', event_on_container_status );
+    script.event.register( 'script_event_on_container_status', script_event_on_container_status );
 
-    // function event_on_container_start( event )
-    // {
-
-    // }
-
-    // script.event.register( 'event_on_container_start', event_on_container_start );
-
-    // function event_on_container_restart()
-    // {
-
-    // }
-
-    // script.event.register( 'event_on_container_restart', event_on_container_restart );
-
-    // function event_on_container_online()
-    // {
-
-    // }
-
-    // script.event.register( 'event_on_container_online', event_on_container_online );
-
-    // function event_on_container_stop( event )
-    // {
-    //     if ( this.child.process == false )
-    //     {
-    //         discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-    //     }
-    //     else
-    //     {
-    //         this.child.process.kill( 'SIGTERM' );
-
-    //         this.child.process = undefined;
-    //     }
-    // }
-
-    // script.event.register( 'event_on_container_stop', event_on_container_stop );
-
-    function event_on_container_error( pid, error )
+    function script_event_on_container_start( event )
     {
-        script.event.trigger( 'event_on_container_error', 'pid -> ' + pid + ' -> ' + error.toString().trim() );
+
     }
 
-    function event_on_container_close( pid, close )
-    {
-        script.event.trigger( 'event_on_container_close', 'pid -> ' + pid + ' -> uptime -> ' + table_of_containers[ pid ].uptime );
+    script.event.register( 'script_event_on_container_start', script_event_on_container_start );
 
-        table_of_containers[ pid ] = undefined;
+    function script_event_on_container_restart()
+    {
+
     }
 
-    function event_on_console_sigint()
+    script.event.register( 'script_event_on_container_restart', script_event_on_container_restart );
+
+    function script_event_on_container_online()
+    {
+
+    }
+
+    script.event.register( 'script_event_on_container_online', script_event_on_container_online );
+
+    function script_event_on_container_stop( pid )
+    {
+        if ( table_of_containers[ pid ].process == false )
+        {
+            console.log( 'Container is currently not running.' );
+
+            // discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
+        }
+        else
+        {
+            table_of_containers[ pid ].process.kill( 'SIGTERM' );
+        }
+    }
+
+    script.event.register( 'script_event_on_container_stop', script_event_on_container_stop );
+
+    function handle_on_container_error( pid, error )
+    {
+        script.event.trigger( 'script_event_on_container_error', 'pid -> ' + pid + ' -> ' + error.toString().trim() );
+    }
+
+    function handle_on_container_close( pid, close )
+    {
+        script.event.trigger( 'script_event_on_container_close', 'pid -> ' + pid + ' -> uptime -> ' + table_of_containers[ pid ].uptime );
+
+        delete table_of_containers[ pid ]
+    }
+
+    function handle_on_console_sigint()
     {
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
             table_of_containers[ key ].process.kill( 'SIGTERM' );
         }
+
+        if ( typeof interval_reference != 'undefined' )
+        {
+            clearInterval( interval_reference );
+        }
     }
 
-    process.on( 'SIGINT', event_on_console_sigint );
+    process.on( 'SIGINT', handle_on_console_sigint );
 
-    //-------------------------------------------------
-    // CLASS FACTORIO SERVER
-    //-------------------------------------------------
+    const maximum_idle_time_of_a_container = 259200;
 
-    // const sleep = require( 'sleep' );
+    function handle_on_container_status()
+    {
+        for ( let [ key, value ] of Object.entries( table_of_containers ) )
+        {
+            if ( Math.floor( Date.now() / 1000 ) - table_of_containers[ key ].activity > maximum_idle_time_of_a_container )
+            {
+                script.event.trigger( 'script_event_on_container_stop', key );
+            }
+        }
+    }
 
-    // while ( true )
-    // {
-    //     if ( factorio.server.online )
-    //     {
-    //         console.log( 'Server is running.' );
-    //     }
-    //     else
-    //     {
-    //         console.log( 'Server is not running.' );
-    //     }
-
-    //     sleep.sleep( 1 );
-    // }
-
-    // if ( process.argv[ 2 ] === 'child' )
-    // {
-    //     const child = spawn( 'ls' );
-
-    //     child.stdout.pipe( process.stdout );
-    // }
-    // else
-    // {
-    //     const child = spawn( process.execPath, [ __filename, 'child' ] );
-    // }
+    const interval_reference = setInterval( handle_on_container_status, 1000 );
 
     //-------------------------------------------------
     // EVENT DISCORD CLIENT ON MESSAGE
     //-------------------------------------------------
 
-    discord.client.on( 'message', async( message ) =>
+    function event_on_message( message )
     {
         if ( message.author.bot || message.type != 'DEFAULT' || message.channel.name !== 'bananas' )
         {
@@ -378,7 +381,7 @@
             {
                 // discord_embedded_message( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', number_of_connected_players[ 1 ] ), 0x0000ff );
 
-                // script.event.trigger( 'event_on_container_status', pid );
+                // script.event.trigger( 'script_event_on_container_status', pid );
 
                 // if ( factorio.server.online )
                 // {
@@ -397,7 +400,7 @@
                 // }
                 // else
                 // {
-                //     script.event.register( 'event_on_container_start', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.start.replace( '__USER__', message.author.username ), 0x00ff00 ) } );
+                //     script.event.register( 'script_event_on_container_start', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.start.replace( '__USER__', message.author.username ), 0x00ff00 ) } );
 
                 //     await factorio.server.start( 'new' );
                 // }
@@ -449,8 +452,9 @@
             //     factorio.server.on_console_chat( message.author.username, content );
             // }
         }
+    }
 
-    } );
+    discord.client.on( 'message', event_on_message );
 
     //-------------------------------------------------
     // CODE
@@ -482,59 +486,53 @@
         */
     }
 
-    const discord_embedded_message = ( channel_name, title, message, color = 0xff0000 ) =>
+    const discord_on_chat = ( name_of_channel, user, message ) =>
     {
-        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
+        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
 
-        if ( bananas == false )
+        if ( handle != false )
         {
-            return;
+            handle.send( '**' + user + '** *' + message + '*' );
         }
-
-        const embed = new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message );
-
-        bananas.send( embed );
     }
 
-    const join_or_leave_message = ( channel_name, user, join_or_leave ) =>
+    const join_or_leave_message = ( name_of_channel, user, join_or_leave ) =>
     {
-        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
+        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
 
-        if ( bananas == false )
+        if ( handle != false )
         {
-            return;
+            handle.send( '**⟶ ' + user + ' ' + join_or_leave + ' the server ⟵**' );
         }
-
-        bananas.send( '**⟶ ' + user + ' ' + join_or_leave + ' the server ⟵**' );
     }
 
-    const discord_on_chat = ( channel_name, user, message ) =>
+    const print_help = ( name_of_channel ) =>
     {
-        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
+        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
 
-        if ( bananas == false )
+        if ( handle != false )
         {
-            return;
-        }
+            let title = 'Commands';
 
-        bananas.send( '**' + user + '** *' + message + '*' );
+            let color = 0xaa55ff;
+
+            let message = '';
+
+            for ( let [ key, value ] of Object.entries( table_of_commands ) )
+            {
+                message += '**!' + key + '** ' + value.parameters + '\n\t↳ ' + value.information + '\n\t↳ Usage: `' + value.usage + '`\n↳Permissions: **' + value.permissions + '**\n\n';
+            }
+
+            handle.send( new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message ) );
+        }
     }
 
-    const print_help = ( channel_name ) =>
+    const discord_embedded_message = ( name_of_channel, title, message, color = 0xff0000 ) =>
     {
-        const bananas = discord.client.channels.find( ( channel ) => channel.name === channel_name );
+        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
 
-        if ( bananas == false )
+        if ( handle != false )
         {
-            return;
+            handle.send( new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message ) );
         }
-
-        let string = '';
-
-        for ( let [ name, value ] of Object.entries( table_of_commands ) )
-        {
-            string += '**!' + name + '** ' + value.parameters + '\n\t↳ ' + value.information + '\n\t↳ Usage: `' + value.usage + '`\n↳Permissions: **' + value.permissions + '**\n\n';
-        }
-
-        discord_embedded_message( channel_name, 'Commands', string, 0xaa55ff );
     }
