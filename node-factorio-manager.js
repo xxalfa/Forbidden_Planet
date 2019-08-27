@@ -5,9 +5,7 @@
 
     "use strict";
 
-    const fs = require( 'fs' );
-
-    const sleep = require( 'sleep' );
+    const os = require( 'os' );
 
     const { spawn, exec } = require( 'child_process' );
 
@@ -29,27 +27,21 @@
 
     const table_of_scenarios = [];
 
-    // table_of_scenarios[ 0 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Tank Conquest', description: 'Drive and shoot.', tags: undefined };
+    // table_of_scenarios[ 0 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Tank Conquest', description: 'Drive and shoot.', tags: undefined, number_of_running_processes: 0 };
 
-    // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined };
+    // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined, number_of_running_processes: 0 };
 
-    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined };
+    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined, number_of_running_processes: 0 };
 
-    // table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined };
+    table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined, number_of_running_processes: 0 };
+
+    table_of_scenarios[ 2 ] = { community: 'GGG', name: 'HHH', description: 'III', tags: undefined, number_of_running_processes: 0 };
+
+    table_of_scenarios[ 3 ] = { community: 'ZZZ', name: 'XXX', description: 'YYY', tags: undefined, number_of_running_processes: 0 };
 
     const table_of_containers = [];
 
     const table_of_stages = {};
-
-    table_of_stages.start = 'Server was **Started** by __USER__.';
-
-    table_of_stages.update = 'Server was **Updated** to __VERSION__ by __USER__.';
-
-    table_of_stages.restart = 'Server was **Restarted** by __USER__.';
-
-    table_of_stages.stop = 'Server was **Stopped** by __USER__.';
-
-    table_of_stages.online = 'Players **Online** __ONLINE__.';
 
     table_of_stages.error = '```__ERROR__```';
 
@@ -64,8 +56,6 @@
     table_of_commands.online = { parameters: '*<**pid**>*', information: 'Displays the current number of online players.', usage: '!online <pid>', permissions: '@Everyone' };
 
     table_of_commands.start = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Starts the server.', usage: '!start <all|pid>', permissions: '@Moderator' };
-
-    table_of_commands.restart = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Restarts the server.', usage: '!restart <all|pid>', permissions: '@Moderator' };
 
     table_of_commands.stop = { parameters: '*<**all**|**pid**>* *default:* **all**', information: 'Stops the server.', usage: '!stop <all|pid>', permissions: '@Moderator' };
 
@@ -95,25 +85,83 @@
             this.table_of_events[ name ] = callback;
         }
 
-        trigger( name )
+        trigger( name, argument )
         {
-            let argument = '';
-
-            for ( let index = 1; index < arguments.length; index++ )
-            {
-                argument = argument + arguments[ index ];
-            }
-
             console.log( 'trigger -> ' + name + ' -> ' + argument );
 
-            if ( this.table_of_events[ name ] )
+            if ( typeof this.table_of_events[ name ] != 'undefined' )
             {
-                this.table_of_events[ name ]( arguments );
+                this.table_of_events[ name ]( argument );
             }
         }
     }
 
     const script = { event: new ScriptEvent() };
+
+    function script_event_on_container_start( pid )
+    {
+        if ( typeof table_of_containers[ pid ] == 'undefined' )
+        {
+            // discord_embedded_message( 'bananas', 'Error', 'Server not found.', 0xff0000 );
+        }
+        else
+        {
+            // const scenario = table_of_containers[ pid ].scenario;
+
+            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario ].community + ' (' + pid + ') ' + table_of_scenarios[ scenario ].name + ' started.', 0x00ff00 );
+        }
+    }
+
+    script.event.register( 'script_event_on_container_start', script_event_on_container_start );
+
+    function script_event_on_container_chat( argv )
+    {
+        for ( let [ key, value ] of Object.entries( table_of_containers ) )
+        {
+            if ( argv[ 0 ] != key && value.online )
+            {
+                const scenario = value.scenario;
+
+                value.process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 255, g = 255, b = 255, a = 1 } )\n" );
+            }
+        }
+    }
+
+    script.event.register( 'script_event_on_container_chat', script_event_on_container_chat );
+
+    function script_event_on_container_status( pid )
+    {
+        if ( typeof table_of_containers[ pid ] == 'undefined' )
+        {
+            // discord_embedded_message( 'bananas', 'Error', 'Server not found.', 0x00ff00 );
+        }
+        else if ( table_of_containers[ pid ].online == true )
+        {
+            // const scenario = table_of_containers[ pid ].scenario;
+
+            // discord_embedded_message( 'bananas', 'Status', table_of_scenarios[ scenario ].community + ' (' + pid + ') ' + table_of_scenarios[ scenario ].name + ' is online.', 0x00ff00 );
+        }
+    }
+
+    script.event.register( 'script_event_on_container_status', script_event_on_container_status );
+
+    function script_event_on_container_stop( pid )
+    {
+        if ( typeof table_of_containers[ pid ] == 'undefined' )
+        {
+            // discord_embedded_message( 'bananas', 'Error', 'Server not found.', 0xff0000 );
+        }
+        else
+        {
+            // const scenario = table_of_containers[ pid ].scenario;
+
+            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + ' stopped.', 0x00ff00 );
+
+            table_of_containers[ pid ].process.kill( 'SIGTERM' );
+        }
+    }
+
+    script.event.register( 'script_event_on_container_stop', script_event_on_container_stop );
 
     //-------------------------------------------------
     // CLASS FACTORIO SERVER
@@ -127,7 +175,7 @@
 
         script.event.trigger( 'script_event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
 
-        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, activity: 0, number_of_connected_players: 0 };
+        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, activity: Math.floor( Date.now() / 1000 ), number_of_connected_players: 0 };
 
         table_of_containers[ container.pid ].process.stdin.setEncoding( 'utf8' );
 
@@ -142,18 +190,15 @@
         table_of_containers[ container.pid ].process.on( 'error', ( error ) => { handle_on_container_error( container.pid, error ) } );
 
         table_of_containers[ container.pid ].process.on( 'close', ( close ) => { handle_on_container_close( container.pid, close ) } );
-    }
 
-    for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
-    {
-        docker_run_container( key, value );
+        table_of_scenarios[ key ].number_of_running_processes += 1;
     }
 
     function handle_on_container_data( pid, data )
     {
         const content = data.toString().replace( /\n\s+/g, '\n' ).trim();
 
-        console.log( pid + ' -> ' + content );
+        // console.log( pid + ' -> ' + content );
 
         const uptime = /^(\d+\.\d{3}).*/.exec( content );
 
@@ -170,7 +215,7 @@
         {
             script.event.trigger( 'script_event_on_container_chat', [ pid, chat[ 1 ], chat[ 2 ] ] );
 
-            // discord_on_chat( 'bananas', chat[ 1 ], chat[ 2 ] );
+            // discord_embedded_message( 'bananas', 'Message', '**' + chat[ 1 ] + '** *' + chat[ 2 ] + '*', 0x00ff00 );
 
             return;
         }
@@ -210,13 +255,13 @@
 
             if ( online )
             {
-                const scenario = table_of_containers[ pid ].scenario;
-
-                script.event.trigger( 'script_event_on_container_online', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name );
-
                 table_of_containers[ pid ].online = true;
 
-                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + '"' );
+                script.event.trigger( 'script_event_on_container_status', pid );
+
+                // const scenario = table_of_containers[ pid ].scenario;
+
+                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + ' #' + pid + '"' );
 
                 // table_of_containers[ pid ].process.stdin.write( '/config set description "' + table_of_scenarios[ scenario ].description + '"' );
 
@@ -236,85 +281,18 @@
         }
     }
 
-    function script_event_on_container_chat( argv )
-    {
-        for ( let [ key, value ] of Object.entries( table_of_containers ) )
-        {
-            if ( argv[ 0 ] != key && table_of_containers[ key ].online )
-            {
-                const scenario = table_of_containers[ key ].scenario;
-
-                table_of_containers[ key ].process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 255, g = 255, b = 255, a = 1 } )\n" );
-            }
-        }
-    }
-
-    script.event.register( 'script_event_on_container_chat', script_event_on_container_chat );
-
-    function script_event_on_container_status( pid )
-    {
-        if ( typeof table_of_containers[ pid ] == 'undefined' )
-        {
-            return;
-        }
-
-        if ( table_of_containers[ pid ].online == true )
-        {
-            // discord_embedded_message( 'bananas', 'Error', 'Server is currently running', 0x00ff00 );
-        }
-        else
-        {
-            // discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-        }
-    }
-
-    script.event.register( 'script_event_on_container_status', script_event_on_container_status );
-
-    function script_event_on_container_start( event )
-    {
-
-    }
-
-    script.event.register( 'script_event_on_container_start', script_event_on_container_start );
-
-    function script_event_on_container_restart()
-    {
-
-    }
-
-    script.event.register( 'script_event_on_container_restart', script_event_on_container_restart );
-
-    function script_event_on_container_online()
-    {
-
-    }
-
-    script.event.register( 'script_event_on_container_online', script_event_on_container_online );
-
-    function script_event_on_container_stop( pid )
-    {
-        if ( table_of_containers[ pid ].process == false )
-        {
-            console.log( 'Container is currently not running.' );
-
-            // discord_embedded_message( 'bananas', 'Error', 'Server is currently not running', 0xff0000 );
-        }
-        else
-        {
-            table_of_containers[ pid ].process.kill( 'SIGTERM' );
-        }
-    }
-
-    script.event.register( 'script_event_on_container_stop', script_event_on_container_stop );
-
     function handle_on_container_error( pid, error )
     {
-        script.event.trigger( 'script_event_on_container_error', 'pid -> ' + pid + ' -> ' + error.toString().trim() );
+        // script.event.trigger( 'script_event_on_container_error', 'pid -> ' + pid + ' -> ' + error.toString().trim() );
     }
 
     function handle_on_container_close( pid, close )
     {
         script.event.trigger( 'script_event_on_container_close', 'pid -> ' + pid + ' -> uptime -> ' + table_of_containers[ pid ].uptime );
+
+        const scenario = table_of_containers[ pid ].scenario;
+
+        table_of_scenarios[ scenario ].number_of_running_processes -= 1;
 
         delete table_of_containers[ pid ]
     }
@@ -323,7 +301,7 @@
     {
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
-            table_of_containers[ key ].process.kill( 'SIGTERM' );
+            value.process.kill( 'SIGTERM' );
         }
 
         if ( typeof interval_reference != 'undefined' )
@@ -338,22 +316,78 @@
 
     function handle_on_container_status()
     {
+        if ( is_still_being_processed == true )
+        {
+            console.log( 'skip container status' );
+
+            return;
+        }
+
+        is_still_being_processed = true;
+
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
-            if ( Math.floor( Date.now() / 1000 ) - table_of_containers[ key ].activity > maximum_idle_time_of_a_container )
+            if ( Math.floor( Date.now() / 1000 ) - value.activity > maximum_idle_time_of_a_container && value.number_of_connected_players < 1 )
             {
                 script.event.trigger( 'script_event_on_container_stop', key );
             }
         }
+
+        const current_cpu_usage = get_cpu_usage();
+
+        const memory_size_free = os.freemem()
+
+        const memory_size_total = os.totalmem();
+
+        const cpu_percent = Math.floor( ( 1 - ( ( current_cpu_usage.idle - last_cpu_usage.idle ) / ( current_cpu_usage.total - last_cpu_usage.total ) ) ) * 100 );
+
+        const memory_percent = Math.floor( ( ( memory_size_total - memory_size_free ) / memory_size_total ) * 100 );
+
+        if ( cpu_percent <= 50 && memory_percent <= 95 )
+        {
+            for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
+            {
+                if ( value.number_of_running_processes == 0 )
+                {
+                    docker_run_container( key, value );
+
+                    break;
+                }
+            }
+        }
+
+        last_cpu_usage = current_cpu_usage;
+
+        is_still_being_processed = false;
     }
 
+    let is_still_being_processed = false;
+
+    let last_cpu_usage = get_cpu_usage();
+
     const interval_reference = setInterval( handle_on_container_status, 1000 );
+
+    function get_cpu_usage()
+    {
+        const cpus = os.cpus();
+
+        const usage = { 'idle': 0, 'total': 0 };
+
+        for ( let cpu in cpus )
+        {
+            usage.idle += cpus[ cpu ].times.idle;
+
+            usage.total += cpus[ cpu ].times.user + cpus[ cpu ].times.nice + cpus[ cpu ].times.sys + cpus[ cpu ].times.idle + cpus[ cpu ].times.irq;
+        }
+
+        return usage;
+    }
 
     //-------------------------------------------------
     // EVENT DISCORD CLIENT ON MESSAGE
     //-------------------------------------------------
 
-    function event_on_message( message )
+    function handle_on_discord_message( message )
     {
         if ( message.author.bot || message.type != 'DEFAULT' || message.channel.name !== 'bananas' )
         {
@@ -371,56 +405,37 @@
 
             if ( message.content.startsWith( '!help' ) )
             {
-                // print_help( 'bananas' );
+                // let message = '';
+
+                // for ( let [ key, value ] of Object.entries( table_of_commands ) )
+                // {
+                //     message += '**!' + key + '** ' + value.parameters + '\n\t↳ ' + value.information + '\n\t↳ Usage: `' + value.usage + '`\n↳Permissions: **' + value.permissions + '**\n\n';
+                // }
+
+                // discord_embedded_message( 'bananas', 'Commands', message, 0xaa55ff );
+
             }
             else if ( message.content.startsWith( '!info' ) )
             {
-                // discord_embedded_message( 'bananas', 'Hardware Information', '3 Cores @ 3,90 GHz -- 8 GByte RAM -- **OS** Linux' );
-            }
-            else if ( message.content.startsWith( '!status' ) )
-            {
-                // discord_embedded_message( 'bananas', 'Status', table_of_stages.online.replace( '__ONLINE__', number_of_connected_players[ 1 ] ), 0x0000ff );
-
-                // script.event.trigger( 'script_event_on_container_status', pid );
-
-                // if ( factorio.server.online )
-                // {
-                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently running.', 0x00ff00 );
-                // }
-                // else
-                // {
-                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently not running.', 0xff0000 );
-                // }
+                // discord_embedded_message( 'bananas', 'Hardware Information', process.platform() );
             }
             else if ( message.content.startsWith( '!start' ) )
             {
-                // if ( factorio.server.online )
-                // {
-                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently running.', 0xff0000 );
-                // }
-                // else
-                // {
-                //     script.event.register( 'script_event_on_container_start', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.start.replace( '__USER__', message.author.username ), 0x00ff00 ) } );
+                // const pid = 0;
 
-                //     await factorio.server.start( 'new' );
-                // }
+                // script.event.trigger( 'script_event_on_container_start', pid, message.author.username );
+            }
+            else if ( message.content.startsWith( '!status' ) )
+            {
+                // const pid = 0;
+
+                // script.event.trigger( 'script_event_on_container_status', pid );
             }
             else if ( message.content.startsWith( '!stop' ) )
             {
-                // if ( factorio.server.online )
-                // {
-                //     script.event.register( 'event_on_process_stopped', () => { discord_embedded_message( 'bananas', 'Status', table_of_stages.stop.replace( '__USER__', message.author.username ), 0xff0000 ) } );
+                // const pid = 0;
 
-                //     await factorio.server.stop();
-                // }
-                // else
-                // {
-                //     discord_embedded_message( 'bananas', 'Error', 'Server is currently not running.', 0xff0000 );
-                // }
-            }
-            else if ( message.content.startsWith( '!restart' ) )
-            {
-
+                // script.event.trigger( 'script_event_on_container_stop', pid, message.author.username );
             }
             else if ( message.content.startsWith( '!kick' ) )
             {
@@ -445,16 +460,13 @@
         }
         else
         {
-            // if ( factorio.server.online )
-            // {
-            //     const content = escape_string( message.cleanContent );
+            // const content = escape_string( message.cleanContent );
 
-            //     factorio.server.on_console_chat( message.author.username, content );
-            // }
+            // script.event.trigger( 'script_event_on_container_chat', [ 0, message.author.username, '[Discord] ' + content ] );
         }
     }
 
-    discord.client.on( 'message', event_on_message );
+    discord.client.on( 'message', handle_on_discord_message );
 
     //-------------------------------------------------
     // CODE
@@ -475,56 +487,13 @@
 
         console.log( user_roles );
 
-        /*
+        // const userRank = table_of_ranks.indexOf( userRankName );
 
-        const userRank = table_of_ranks.indexOf( userRankName );
+        // const requiredRank = table_of_ranks.indexOf( permission );
 
-        const requiredRank = table_of_ranks.indexOf( permission );
+        // message.reply( `User Rank: ${userRank}, required: ${requiredRank}` );
 
-        message.reply( `User Rank: ${userRank}, required: ${requiredRank}` );
-
-        */
-    }
-
-    const discord_on_chat = ( name_of_channel, user, message ) =>
-    {
-        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
-
-        if ( handle != false )
-        {
-            handle.send( '**' + user + '** *' + message + '*' );
-        }
-    }
-
-    const join_or_leave_message = ( name_of_channel, user, join_or_leave ) =>
-    {
-        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
-
-        if ( handle != false )
-        {
-            handle.send( '**⟶ ' + user + ' ' + join_or_leave + ' the server ⟵**' );
-        }
-    }
-
-    const print_help = ( name_of_channel ) =>
-    {
-        const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
-
-        if ( handle != false )
-        {
-            let title = 'Commands';
-
-            let color = 0xaa55ff;
-
-            let message = '';
-
-            for ( let [ key, value ] of Object.entries( table_of_commands ) )
-            {
-                message += '**!' + key + '** ' + value.parameters + '\n\t↳ ' + value.information + '\n\t↳ Usage: `' + value.usage + '`\n↳Permissions: **' + value.permissions + '**\n\n';
-            }
-
-            handle.send( new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message ) );
-        }
+        return true;
     }
 
     const discord_embedded_message = ( name_of_channel, title, message, color = 0xff0000 ) =>
@@ -535,4 +504,17 @@
         {
             handle.send( new RichEmbed().setTimestamp().setTitle( '**' + title + '**' ).setColor( color ).setDescription( message ) );
         }
+    }
+
+    function human_readable_file_size( bytes, precision = 2 )
+    {
+        if ( bytes === 0 ) return '0 Bytes';
+
+        const dm = precision < 0 ? 0 : precision;
+
+        const label = [ 'Bytes', 'KByte', 'MByte', 'GByte', 'TByte', 'PByte', 'EByte', 'ZByte', 'YByte' ];
+
+        const index = Math.floor( Math.log( bytes ) / Math.log( 1024 ) );
+
+        return parseFloat( ( bytes / Math.pow( 1024, index ) ).toFixed( dm ) ) + ' ' + label[ index ];
     }
