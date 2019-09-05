@@ -17,6 +17,8 @@
 
     // discord.client.login( auth.token );
 
+    let latest_factorio_version = undefined;
+
     //-------------------------------------------------
     // TABLES
     //-------------------------------------------------
@@ -27,17 +29,17 @@
 
     const table_of_scenarios = [];
 
-    // table_of_scenarios[ 0 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Tank Conquest', description: 'Drive and shoot.', tags: undefined, number_of_running_processes: 0 };
+    // table_of_scenarios[ 0 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Tank Conquest', description: 'Drive and shoot.', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
-    // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined, number_of_running_processes: 0 };
+    // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
-    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined, number_of_running_processes: 0 };
+    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
-    table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined, number_of_running_processes: 0 };
+    table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
-    table_of_scenarios[ 2 ] = { community: 'GGG', name: 'HHH', description: 'III', tags: undefined, number_of_running_processes: 0 };
+    table_of_scenarios[ 2 ] = { community: 'GGG', name: 'HHH', description: 'III', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
-    table_of_scenarios[ 3 ] = { community: 'ZZZ', name: 'XXX', description: 'YYY', tags: undefined, number_of_running_processes: 0 };
+    table_of_scenarios[ 3 ] = { community: 'ZZZ', name: 'XXX', description: 'YYY', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
 
     const table_of_containers = [];
 
@@ -118,7 +120,7 @@
     {
         for ( let [ key, value ] of Object.entries( table_of_containers ) )
         {
-            if ( argv[ 0 ] != key && value.online )
+            if ( argv[ 0 ] != key && value.is_public == true )
             {
                 const scenario = value.scenario;
 
@@ -135,7 +137,7 @@
         {
             // discord_embedded_message( 'bananas', 'Error', 'Server not found.', 0x00ff00 );
         }
-        else if ( table_of_containers[ pid ].online == true )
+        else if ( table_of_containers[ pid ].is_public == true )
         {
             // const scenario = table_of_containers[ pid ].scenario;
 
@@ -175,7 +177,7 @@
 
         script.event.trigger( 'script_event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
 
-        table_of_containers[ container.pid ] = { process: container, scenario: key, version: undefined, online: false, uptime: 0, activity: Math.floor( Date.now() / 1000 ), number_of_connected_players: 0 };
+        table_of_containers[ container.pid ] = { process: container, scenario: key, version: '0.0.0', is_public: false, uptime: 0, activity: Math.floor( Date.now() / 1000 ), number_of_connected_players: 0 };
 
         table_of_containers[ container.pid ].process.stdin.setEncoding( 'utf8' );
 
@@ -190,8 +192,6 @@
         table_of_containers[ container.pid ].process.on( 'error', ( error ) => { handle_on_container_error( container.pid, error ) } );
 
         table_of_containers[ container.pid ].process.on( 'close', ( close ) => { handle_on_container_close( container.pid, close ) } );
-
-        table_of_scenarios[ key ].number_of_running_processes += 1;
     }
 
     function handle_on_container_data( pid, data )
@@ -243,19 +243,25 @@
 
             if ( version )
             {
+                latest_factorio_version = version[ 1 ];
+
                 table_of_containers[ pid ].version = version[ 1 ];
+
+                const scenario = table_of_containers[ pid ].scenario;
+
+                table_of_scenarios[ scenario ].version = version[ 1 ];
 
                 return;
             }
         }
 
-        if ( table_of_containers[ pid ].online == false )
+        if ( table_of_containers[ pid ].is_public == false )
         {
             const online = /.*Matching server connection resumed.*/.test( content );
 
             if ( online )
             {
-                table_of_containers[ pid ].online = true;
+                table_of_containers[ pid ].is_public = true;
 
                 script.event.trigger( 'script_event_on_container_status', pid );
 
@@ -304,9 +310,9 @@
             value.process.kill( 'SIGTERM' );
         }
 
-        if ( typeof interval_reference != 'undefined' )
+        if ( typeof reference_for_container_status != 'undefined' )
         {
-            clearInterval( interval_reference );
+            clearInterval( reference_for_container_status );
         }
     }
 
@@ -325,14 +331,6 @@
 
         is_still_being_processed = true;
 
-        for ( let [ key, value ] of Object.entries( table_of_containers ) )
-        {
-            if ( Math.floor( Date.now() / 1000 ) - value.activity > maximum_idle_time_of_a_container && value.number_of_connected_players < 1 )
-            {
-                script.event.trigger( 'script_event_on_container_stop', key );
-            }
-        }
-
         const current_cpu_usage = get_cpu_usage();
 
         const memory_size_free = os.freemem()
@@ -345,13 +343,33 @@
 
         if ( cpu_percent <= 50 && memory_percent <= 95 )
         {
+            // Wenn docker pull eine neue version hat, dann setzte die version auf undefined
+
+            // latest_factorio_version = undefined;
+
+            // table_of_scenarios[ all ].version = undefined;
+
             for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
             {
-                if ( value.number_of_running_processes == 0 )
+                if ( value.version == undefined || value.number_of_running_processes == 0 || value.further_start_desired == true )
                 {
+                    value.version = '0.0.0';
+
+                    value.number_of_running_processes += 1;
+
+                    value.further_start_desired = false;
+
                     docker_run_container( key, value );
 
                     break;
+                }
+            }
+
+            for ( let [ key, value ] of Object.entries( table_of_containers ) )
+            {
+                if ( Math.floor( Date.now() / 1000 ) - value.activity > maximum_idle_time_of_a_container && value.number_of_connected_players < 1 )
+                {
+                    script.event.trigger( 'script_event_on_container_stop', key );
                 }
             }
         }
@@ -365,7 +383,7 @@
 
     let last_cpu_usage = get_cpu_usage();
 
-    const interval_reference = setInterval( handle_on_container_status, 1000 );
+    const reference_for_container_status = setInterval( handle_on_container_status, 1000 );
 
     function get_cpu_usage()
     {
