@@ -124,7 +124,7 @@
             {
                 const scenario = value.scenario;
 
-                value.process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 255, g = 255, b = 255, a = 1 } )\n" );
+                value.process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 0.3, g = 0.4, b = 1, a = 1 } )\n" );
             }
         }
     }
@@ -445,6 +445,8 @@
             }
             else if ( message.content.startsWith( '!status' ) )
             {
+                // nmap -p 34197 -sU localhost | grep open
+
                 // const pid = 0;
 
                 // script.event.trigger( 'script_event_on_container_status', pid );
@@ -457,23 +459,53 @@
             }
             else if ( message.content.startsWith( '!kick' ) )
             {
-
+                // const { server } = this
+                // if (!user) {
+                //   server.events.trigger('error', { name: 'kick', invoker, time: new Date(), data: 'No user specified' })
+                //   return
+                // }
+                // server.process.stdin.write(`/silent-command game.kick_player('${user}', '${reason}')\n`)
+                // server.events.trigger('success', { name: 'kick', invoker, time: new Date(), data: [user, reason] })
             }
             else if ( message.content.startsWith( '!ban' ) )
             {
-
+                // const { server } = this
+                // if (!user) {
+                //   server.events.trigger('error', { name: 'ban', invoker, time: new Date(), data: 'No user specified' })
+                //   return
+                // }
+                // server.process.stdin.write(`/silent-command game.ban_player('${user}', '${reason}')\n`)
+                // server.events.trigger('success', { name: 'ban', invoker, time: new Date(), data: [user, reason] })
             }
             else if ( message.content.startsWith( '!unban' ) )
             {
-
+                // const { server } = this
+                // if (!user) {
+                //   server.events.trigger('error', { name: 'unban', invoker, time: new Date(), data: 'No user specified' })
+                //   return
+                // }
+                // server.process.stdin.write(`/silent-command game.unban_player('${user}')\n`)
+                // server.events.trigger('success', { name: 'unban', invoker, time: new Date(), data: [user] })
             }
             else if ( message.content.startsWith( '!promote' ) )
             {
-
+                // const { server } = this
+                // if (!user) {
+                //   server.events.trigger('error', { name: 'promote', invoker, time: new Date(), data: 'No user specified' })
+                //   return
+                // }
+                // server.process.stdin.write(`/silent-command if game.players['${user}'] then game.players['${user}'].admin = true end\n`)
+                // server.events.trigger('success', { name: 'promote', invoker, time: new Date(), data: [user] })
             }
             else if ( message.content.startsWith( '!demote' ) )
             {
-
+                // const { server } = this
+                // if (!user) {
+                //   server.events.trigger('error', { name: 'promote', invoker, time: new Date(), data: 'No user specified' })
+                //   return
+                // }
+                // server.process.stdin.write(`/silent-command if game.players['${user}'] then game.players['${user}'].admin = false end\n`)
+                // server.events.trigger('success', { name: 'promote', invoker, time: new Date(), data: [user] })
             }
         }
         else
@@ -511,12 +543,35 @@
 
         // message.reply( `User Rank: ${userRank}, required: ${requiredRank}` );
 
+        // const { roles, commands } = this.options
+        // const permission = commands[command].permissions
+        // let userRole = roles.length - 1
+
+        // for(let index in roles){
+        //   if(message.member.roles.find(r => r.name === roles[index])){
+        //     userRole = index
+        //     break
+        //   }
+        // }
+
+        // const requiredRole = roles.indexOf(permission)
+
+        // if(requiredRole >= userRole)
+        //   return true
+        // else
+        //   return false
+
         return true;
     }
 
     const discord_embedded_message = ( name_of_channel, title, message, color = 0xff0000 ) =>
     {
         const handle = discord.client.channels.find( ( channel ) => channel.name === name_of_channel );
+
+        // if(attachment)
+        //   return channel.send(embed.attachFile(attachment))
+        // else
+        //   return channel.send(embed)
 
         if ( handle != false )
         {
