@@ -3,9 +3,17 @@
     // HEAD
     //-------------------------------------------------
 
-    "use strict";
+    'use strict';
+
+    // const pdo = require( 'pdo' );
+
+    // const data_source_name = 'sqlite:' + __dirname + __filename.substring( __dirname.length, __filename.lastIndexOf( '.' ) ) + '.sqlite';
+
+    const http = require( 'http' );
 
     const os = require( 'os' );
+
+    const fs = require( 'fs' );
 
     const { spawn, exec } = require( 'child_process' );
 
@@ -17,29 +25,117 @@
 
     // discord.client.login( auth.token );
 
-    let latest_factorio_version = undefined;
+    const upload_speed = { minimum: 100, maximum: 600, current: 600 };
+
+    //-------------------------------------------------
+    // IMAGES
+    //-------------------------------------------------
+
+    const table_of_images = [];
+
+    exec( 'docker images --all --format "{{.Repository}}:{{.Tag}}"', handle_on_docker_images )
+
+    function handle_on_docker_images( error, stdout, stderr )
+    {
+        if ( error || stderr )
+        {
+            throw error || stderr;
+        }
+
+        const array_of_items = stdout.match( /factoriotools\/factorio:.*/gi );
+
+        const length_of_items = array_of_items.length;
+
+        for ( let item_index = 0; item_index < length_of_items; item_index++ )
+        {
+            table_of_images[ item_index ] = { name: array_of_items[ item_index ], number_of_containers_running: 0, further_start_desired: false };
+
+            // break; // If only one image should be loaded.
+        }
+    }
+
+    //-------------------------------------------------
+    // SCENARIOS
+    //-------------------------------------------------
+
+    const table_of_scenarios = [];
+
+    const scenario_path = '/opt/factorio/scenarios';
+
+    fs.readdir( scenario_path, handle_on_read_dir );
+
+    function handle_on_read_dir( error, array_of_items )
+    {
+        if ( error )
+        {
+            throw error;
+        }
+
+        const length_of_items = array_of_items.length;
+
+        for ( let item_index = 0; item_index < length_of_items; item_index++ )
+        {
+            const item_name = array_of_items[ item_index ];
+
+            const item_path = scenario_path + '/' + item_name;
+
+            if ( fs.lstatSync( item_path ).isDirectory() )
+            {
+                // if exsist description.txt
+
+                table_of_scenarios[ item_index ] = { label: '[color=blue]~COMFY~[/color]', name: item_name, description: '', tags: table_of_tags };
+            }
+        }
+    }
 
     //-------------------------------------------------
     // TABLES
     //-------------------------------------------------
 
-    const table_of_ranks = [ 'Administrator', 'Moderator', 'Trusted', 'Everyone' ];
+    // chattr +i /opt/factorio/saves/Tank Conquest.zip
 
-    const table_of_images = [ 'factoriotools/factorio' ];
+    // chattr +i /opt/factorio/saves/Tank Conquest.tmp.zip
 
-    const table_of_scenarios = [];
+    // chattr -i /opt/factorio/saves/Tank Conquest.zip
 
-    // table_of_scenarios[ 0 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Tank Conquest', description: 'Drive and shoot.', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    // chattr -i /opt/factorio/saves/Tank Conquest.tmp.zip
 
-    // table_of_scenarios[ 1 ] = { community: '[color=blue]~COMFY~[/color]', name: 'Biter Battles', description: 'Fight.', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    // for ( let [ scenario_key, scenario_value ] of Object.entries( table_of_scenarios ) )
+    // {
+    //     const file_path = '/opt/factorio/saves/' + scenario_value.name + '.zip';
 
-    table_of_scenarios[ 0 ] = { community: 'AAA', name: 'BBB', description: 'CCC', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    //     console.log( file_path );
 
-    table_of_scenarios[ 1 ] = { community: 'DDD', name: 'EEE', description: 'FFF', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    //     fs.access( file_path, fs.constants.F_OK, handle_on_file_exists );
+    // }
 
-    table_of_scenarios[ 2 ] = { community: 'GGG', name: 'HHH', description: 'III', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    // const file_path = '/opt/factorio/saves/Tank Conquest.zip';
 
-    table_of_scenarios[ 3 ] = { community: 'ZZZ', name: 'XXX', description: 'YYY', tags: undefined, version: undefined, number_of_running_processes: 0, further_start_desired: false };
+    // console.log( file_path );
+
+    // fs.access( file_path, fs.constants.F_OK, handle_on_file_exists );
+
+    // function handle_on_file_exists( error )
+    // {
+    //     if ( error )
+    //     {
+    //         console.log( error );
+    //     }
+    //     else
+    //     {
+
+    //     }
+    // }
+
+    //-------------------------------------------------
+    // TABLES
+    //-------------------------------------------------
+
+    let service_port = { tcp: 20000, udp: 30000 };
+
+    const table_of_tags = 'Hosted\xA0by\xA0XaLpHa1989 Linux\xA0Ubuntu\xA0Headless 24h\xA0DC\xA0at\xA004:28\xA0(CET/MEZ)';
+
+    const table_of_ranks = [ 'Everyone', 'Trusted', 'Moderator', 'Administrator' ];
 
     const table_of_containers = [];
 
@@ -79,7 +175,7 @@
     {
         constructor()
         {
-            this.table_of_events = {};
+            this.table_of_events = [];
         }
 
         register( name, callback )
@@ -108,9 +204,9 @@
         }
         else
         {
-            // const scenario = table_of_containers[ pid ].scenario;
+            // const scenario_identity = table_of_containers[ pid ].scenario_identity;
 
-            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario ].community + ' (' + pid + ') ' + table_of_scenarios[ scenario ].name + ' started.', 0x00ff00 );
+            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario_identity ].label + ' (' + pid + ') ' + table_of_scenarios[ scenario_identity ].name + ' started.', 0x00ff00 );
         }
     }
 
@@ -118,13 +214,13 @@
 
     function script_event_on_container_chat( argv )
     {
-        for ( let [ key, value ] of Object.entries( table_of_containers ) )
-        {
-            if ( argv[ 0 ] != key && value.is_public == true )
-            {
-                const scenario = value.scenario;
+        argv[ 3 ] = argv[ 3 ].replace( /\W/g, '\x20' );
 
-                value.process.stdin.write( "/silent-command game.print( '[" + table_of_scenarios[ scenario ].name + " #" + key + "] " + argv[ 1 ] + ": " + argv[ 2 ] + "', { r = 0.3, g = 0.4, b = 1, a = 1 } )\n" );
+        for ( let [ container_key, container_value ] of Object.entries( table_of_containers ) )
+        {
+            if ( argv[ 0 ] != container_key && container_value.is_public == true )
+            {
+                container_value.process.stdin.write( "/silent-command game.print( '" + argv[ 1 ] + " (" + argv[ 2 ] + "): " + argv[ 3 ] + "', { r = 150, g = 100, b = 255, a = 255 } )\n" );
             }
         }
     }
@@ -139,9 +235,9 @@
         }
         else if ( table_of_containers[ pid ].is_public == true )
         {
-            // const scenario = table_of_containers[ pid ].scenario;
+            // const scenario_identity = table_of_containers[ pid ].scenario_identity;
 
-            // discord_embedded_message( 'bananas', 'Status', table_of_scenarios[ scenario ].community + ' (' + pid + ') ' + table_of_scenarios[ scenario ].name + ' is online.', 0x00ff00 );
+            // discord_embedded_message( 'bananas', 'Status', table_of_scenarios[ scenario_identity ].label + ' (' + pid + ') ' + table_of_scenarios[ scenario_identity ].name + ' is online.', 0x00ff00 );
         }
     }
 
@@ -155,9 +251,9 @@
         }
         else
         {
-            // const scenario = table_of_containers[ pid ].scenario;
+            // const scenario_identity = table_of_containers[ pid ].scenario_identity;
 
-            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + ' stopped.', 0x00ff00 );
+            // discord_embedded_message( 'bananas', 'Error', table_of_scenarios[ scenario_identity ].label + ' ' + table_of_scenarios[ scenario_identity ].name + ' stopped.', 0x00ff00 );
 
             table_of_containers[ pid ].process.kill( 'SIGTERM' );
         }
@@ -169,15 +265,15 @@
     // CLASS FACTORIO SERVER
     //-------------------------------------------------
 
-    function docker_run_container( key, value )
+    function docker_run_container( image_identity, image_name, scenario_identity, scenario_name )
     {
-        // const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdin', '--attach', 'stdout', '--attach', 'stderr', '--env', 'RCON_PORT=2000' + key, '--publish', '0.0.0.0:2000' + key + ':2000' + key + '/tcp', '--env', 'PORT=3000' + key, '--publish', '0.0.0.0:3000' + key + ':3000' + key + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', 'factoriotools/factorio', 'ComfyFactorio' ] );
+        const last_game_timestamp = Math.floor( Date.now() / 1000 );
 
-        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdin', '--attach', 'stdout', '--attach', 'stderr', 'factoriotools/factorio' ] );
+        const container = spawn( 'docker', [ 'run', '--rm', '--interactive', '--attach', 'stdin', '--attach', 'stdout', '--attach', 'stderr', '--env', 'RCON_PORT=' + service_port.tcp, '--publish', '0.0.0.0:' + service_port.tcp + ':' + service_port.tcp + '/tcp', '--env', 'PORT=' + service_port.udp, '--publish', '0.0.0.0:' + service_port.udp + ':' + service_port.udp + '/udp', '--volume', '/opt/factorio:/factorio', '--entrypoint', '/scenario.sh', image_name, scenario_name ] );
 
-        script.event.trigger( 'script_event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> scenario -> ' + value.community + ' ' + value.name );
+        script.event.trigger( 'script_event_on_container_start', 'process -> ' + process.pid + ' -> container -> ' + container.pid + ' -> image -> ' + image_name + ' -> scenario -> ' + scenario_name );
 
-        table_of_containers[ container.pid ] = { process: container, scenario: key, version: '0.0.0', is_public: false, uptime: 0, activity: Math.floor( Date.now() / 1000 ), number_of_connected_players: 0 };
+        table_of_containers[ container.pid ] = { process: container, image_identity: image_identity, scenario_identity: scenario_identity, service_port_tcp: service_port.tcp, service_port_udp: service_port.udp, is_initialised: false, version: undefined, is_public: false, last_game_tick: 0, last_game_timestamp: last_game_timestamp, number_of_connected_players: 0 };
 
         table_of_containers[ container.pid ].process.stdin.setEncoding( 'utf8' );
 
@@ -200,36 +296,32 @@
 
         // console.log( pid + ' -> ' + content );
 
-        const uptime = /^(\d+\.\d{3}).*/.exec( content );
-
-        if ( uptime )
+        if ( /.*\d+\.\d{3}.*/.test( content ) )
         {
-            table_of_containers[ pid ].uptime = uptime[ 1 ];
-
-            table_of_containers[ pid ].activity = Math.floor( Date.now() / 1000 );
+            table_of_containers[ pid ].last_game_timestamp = Math.floor( Date.now() / 1000 );
         }
 
-        const chat = /.*\[CHAT\]\s(.*):\s(.*)/.exec( content );
+        const chat_message = /.*\[CHAT\]\s(.*):\s(.*)/.exec( content );
 
-        if ( chat )
+        if ( chat_message )
         {
-            script.event.trigger( 'script_event_on_container_chat', [ pid, chat[ 1 ], chat[ 2 ] ] );
+            script.event.trigger( 'script_event_on_container_chat', [ pid, chat_message[ 1 ], table_of_containers[ pid ].version, chat_message[ 2 ] ] );
 
-            // discord_embedded_message( 'bananas', 'Message', '**' + chat[ 1 ] + '** *' + chat[ 2 ] + '*', 0x00ff00 );
+            // discord_embedded_message( 'bananas', 'Message', '**' + chat_message[ 1 ] + '** *' + chat_message[ 2 ] + '*', 0x00ff00 );
 
             return;
         }
 
-        const join_or_leave = /.*\[PLAYER-(JOIN|LEAVE)\](.*)$/.exec( content );
+        const adding_or_removing_peer = /.*(adding|removing)\speer\(\d+\).*/.exec( content );
 
-        if ( join_or_leave )
+        if ( adding_or_removing_peer )
         {
-            if ( join_or_leave[ 1 ] == 'JOIN' )
+            if ( adding_or_removing_peer[ 1 ] == 'adding' )
             {
                 table_of_containers[ pid ].number_of_connected_players += 1;
             }
 
-            if ( join_or_leave[ 1 ] == 'LEAVE' )
+            if ( adding_or_removing_peer[ 1 ] == 'removing' )
             {
                 table_of_containers[ pid ].number_of_connected_players -= 1;
             }
@@ -237,19 +329,68 @@
             return;
         }
 
+        const last_game_tick = /^\[GAME_TICK\](\d+)$/.exec( content );
+
+        if ( last_game_tick )
+        {
+            table_of_containers[ pid ].last_game_tick = last_game_tick[ 1 ];
+
+            return;
+        }
+
+        const support_request = /^\[SUPPORT\](.*)\[REQUEST\](.*)$/.exec( content );
+
+        if ( support_request )
+        {
+            fs.appendFile( 'support_request.txt', '\n' + Math.floor( Date.now() / 1000 ) + ' -- ' + table_of_containers[ pid ].version + ' -- ' + support_request[ 1 ] + ' -- ' + support_request[ 2 ], ( error ) => {} );
+
+            table_of_containers[ pid ].process.stdin.write( '/silent-command game.players[ "' + support_request[ 1 ] + '" ].print( "Assimilation completed. Thank you very much.", { r = 1, g = 0, b = 1 } )\n' );
+
+            return;
+        }
+
+        const error_occurred = /.*(Error\s.*)/.exec( content );
+
+        if ( error_occurred )
+        {
+            script.event.trigger( 'script_event_on_container_error', [ pid, error_occurred[ 1 ] ] );
+
+            // discord_embedded_message( 'bananas', 'Error', table_of_stages.error.replace( '__ERROR__', error_occurred[ 1 ] ), 0xff0000 );
+
+            return;
+        }
+
         if ( table_of_containers[ pid ].version == undefined )
         {
-            const version = /.*Factorio\s(.*)\s\((build.*)\).*/.exec( content );
+            const container_version = /.*Factorio\s(.*)\s\(build.*\).*/.exec( content );
 
-            if ( version )
+            if ( container_version )
             {
-                latest_factorio_version = version[ 1 ];
+                table_of_containers[ pid ].version = container_version[ 1 ];
 
-                table_of_containers[ pid ].version = version[ 1 ];
+                return;
+            }
+        }
 
-                const scenario = table_of_containers[ pid ].scenario;
+        if ( table_of_containers[ pid ].is_initialised == false )
+        {
+            const is_initialised = /.*Factorio\sinitialised$/.exec( content );
 
-                table_of_scenarios[ scenario ].version = version[ 1 ];
+            if ( is_initialised )
+            {
+                table_of_containers[ pid ].is_initialised = true;
+
+                const scenario_identity = table_of_containers[ pid ].scenario_identity;
+
+                table_of_containers[ pid ].process.stdin.write( '/config set name ' + table_of_scenarios[ scenario_identity ].label + ' ' + table_of_scenarios[ scenario_identity ].name + '\n' );
+
+                table_of_containers[ pid ].process.stdin.write( '/config set description ' + table_of_scenarios[ scenario_identity ].description + '\n' );
+
+                table_of_containers[ pid ].process.stdin.write( '/config set tags ' + table_of_scenarios[ scenario_identity ].tags + '\n' );
+
+                table_of_containers[ pid ].process.stdin.write( '/config set max-upload-slots 1\n' );
+
+                table_of_containers[ pid ].process.stdin.write( '/config set max-upload-speed ' + upload_speed.maximum + '\n' );
 
                 return;
             }
@@ -257,62 +398,56 @@
 
         if ( table_of_containers[ pid ].is_public == false )
         {
-            const online = /.*Matching server connection resumed.*/.test( content );
+            const is_public = /.*Matching\sserver\sconnection\sresumed.*/.test( content );
 
-            if ( online )
+            if ( is_public )
             {
                 table_of_containers[ pid ].is_public = true;
 
-                script.event.trigger( 'script_event_on_container_status', pid );
+                script.event.trigger( 'script_event_on_container_status', [ pid, 'is_public' ] );
 
-                // const scenario = table_of_containers[ pid ].scenario;
-
-                // table_of_containers[ pid ].process.stdin.write( '/config set name "' + table_of_scenarios[ scenario ].community + ' ' + table_of_scenarios[ scenario ].name + ' #' + pid + '"' );
-
-                // table_of_containers[ pid ].process.stdin.write( '/config set description "' + table_of_scenarios[ scenario ].description + '"' );
+                // table_of_containers[ pid ].process.stdin.write( '/silent-command local bla = require( "utils.server" ) bla.set_time(' + Math.floor( Date.now() / 1000 ) + ') bla.query_online_players() \n' );
 
                 return;
             }
-        }
-
-        const error = /.*(Error\s.*)/.exec( content );
-
-        if ( error )
-        {
-            script.event.trigger( 'script_event_on_container_error', pid + ' -> ' + error[ 1 ] );
-
-            // discord_embedded_message( 'bananas', 'Error', table_of_stages.error.replace( '__ERROR__', error[ 1 ] ), 0xff0000 );
-
-            return;
         }
     }
 
     function handle_on_container_error( pid, error )
     {
-        // script.event.trigger( 'script_event_on_container_error', 'pid -> ' + pid + ' -> ' + error.toString().trim() );
+        // script.event.trigger( 'script_event_on_container_error', [ pid, error.toString().trim() ] );
     }
 
     function handle_on_container_close( pid, close )
     {
-        script.event.trigger( 'script_event_on_container_close', 'pid -> ' + pid + ' -> uptime -> ' + table_of_containers[ pid ].uptime );
+        script.event.trigger( 'script_event_on_container_close', pid );
 
-        const scenario = table_of_containers[ pid ].scenario;
+        const image_identity = table_of_containers[ pid ].image_identity;
 
-        table_of_scenarios[ scenario ].number_of_running_processes -= 1;
+        table_of_images[ image_identity ].number_of_containers_running -= 1;
 
-        delete table_of_containers[ pid ]
+        delete table_of_containers[ pid ];
     }
 
     function handle_on_console_sigint()
     {
-        for ( let [ key, value ] of Object.entries( table_of_containers ) )
+        for ( let [ container_key, container_value ] of Object.entries( table_of_containers ) )
         {
-            value.process.kill( 'SIGTERM' );
+            // const scenario_identity = container_value.scenario_identity;
+
+            // container_value.process.stdin.write( '/server-save ' + table_of_scenarios[ scenario_identity ].name + '-' + Date.now() + '-' + container_key + '\n' );
+
+            container_value.process.kill( 'SIGTERM' );
         }
 
-        if ( typeof reference_for_container_status != 'undefined' )
+        if ( typeof instance_container_status != 'undefined' )
         {
-            clearInterval( reference_for_container_status );
+            clearInterval( instance_container_status );
+        }
+
+        if ( typeof instance_web_access != 'undefined' )
+        {
+            instance_web_access.close();
         }
     }
 
@@ -322,15 +457,6 @@
 
     function handle_on_container_status()
     {
-        if ( is_still_being_processed == true )
-        {
-            console.log( 'skip container status' );
-
-            return;
-        }
-
-        is_still_being_processed = true;
-
         const current_cpu_usage = get_cpu_usage();
 
         const memory_size_free = os.freemem()
@@ -343,53 +469,54 @@
 
         if ( cpu_percent <= 50 && memory_percent <= 95 )
         {
-            // Wenn docker pull eine neue version hat, dann setzte die version auf undefined
-
-            // latest_factorio_version = undefined;
-
-            // table_of_scenarios[ all ].version = undefined;
-
-            for ( let [ key, value ] of Object.entries( table_of_scenarios ) )
+            for ( let [ image_key, image_value ] of Object.entries( table_of_images ) )
             {
-                if ( value.version == undefined || value.number_of_running_processes == 0 || value.further_start_desired == true )
+                for ( let [ scenario_key, scenario_value ] of Object.entries( table_of_scenarios ) )
                 {
-                    value.version = '0.0.0';
+                    if ( image_value.number_of_containers_running == 0 || image_value.further_start_desired == true )
+                    {
+                        image_value.number_of_containers_running += 1;
 
-                    value.number_of_running_processes += 1;
+                        image_value.further_start_desired = false;
 
-                    value.further_start_desired = false;
+                        const image_identity = image_key;
 
-                    docker_run_container( key, value );
+                        const image_name = image_value.name;
 
-                    break;
+                        const scenario_identity = scenario_key;
+
+                        const scenario_name = scenario_value.name;
+
+                        docker_run_container( image_identity, image_name, scenario_identity, scenario_name );
+
+                        service_port.tcp += 1;
+
+                        service_port.udp += 1;
+
+                        break;
+                    }
                 }
             }
 
-            for ( let [ key, value ] of Object.entries( table_of_containers ) )
+            const current_timestamp = Math.floor( Date.now() / 1000 );
+
+            for ( let [ container_key, container_value ] of Object.entries( table_of_containers ) )
             {
-                if ( Math.floor( Date.now() / 1000 ) - value.activity > maximum_idle_time_of_a_container && value.number_of_connected_players < 1 )
+                if ( container_value.last_game_tick > 216000 && current_timestamp - container_value.last_game_timestamp > maximum_idle_time_of_a_container && container_value.number_of_connected_players <= 0 )
                 {
-                    script.event.trigger( 'script_event_on_container_stop', key );
+                    script.event.trigger( 'script_event_on_container_stop', container_key );
                 }
             }
         }
 
         last_cpu_usage = current_cpu_usage;
-
-        is_still_being_processed = false;
     }
-
-    let is_still_being_processed = false;
-
-    let last_cpu_usage = get_cpu_usage();
-
-    const reference_for_container_status = setInterval( handle_on_container_status, 1000 );
 
     function get_cpu_usage()
     {
         const cpus = os.cpus();
 
-        const usage = { 'idle': 0, 'total': 0 };
+        let usage = { 'idle': 0, 'total': 0 };
 
         for ( let cpu in cpus )
         {
@@ -399,6 +526,73 @@
         }
 
         return usage;
+    }
+
+    let last_cpu_usage = get_cpu_usage();
+
+    const instance_container_status = setInterval( handle_on_container_status, 1000 );
+
+    //-------------------------------------------------
+    // WEB ACCESS
+    //-------------------------------------------------
+
+    const instance_web_access = http.createServer( handle_on_web_access ).listen( 80 );
+
+    function handle_on_web_access( request, response )
+    {
+        let content = '';
+
+        if ( /^\/$/.test( request.url ) )
+        {
+            for ( let [ container_key, container_value ] of Object.entries( table_of_containers ) )
+            {
+                if ( container_value.is_initialised )
+                {
+                    container_value.process.stdin.write( '/silent-command local print_override = require( "utils.print_override" ) print_override.raw_print( "[GAME_TICK]" .. game.tick )\n' );
+                }
+            }
+
+            response.writeHead( 200, { 'Content-Type': 'text/html' } );
+
+            content += '<!DOCTYPE html><title>Node Factorio Manager</title><meta charset="utf-8"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="format-detection" content="telephone=no"><meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=5.0">';
+
+            content += '<style type="text/css">*{margin:0;padding:0;text-decoration:none;text-rendering:auto;box-sizing:border-box;font-size:100%;font-family:monospace;}table{table-layout:auto;border-collapse:collapse;width:100%;text-align:center;}th{padding:0;font-weight:normal;}td{padding:0;border:1px solid black;}</style>';
+
+            content += '<table><tr><th>image_name</th><th>scenario_name</th><th>players</th><th>last_game_tick</th><th>last_game_timestamp</th><th>tcp</th><th>udp</th></tr>';
+
+            for ( let [ container_key, container_value ] of Object.entries( table_of_containers ) )
+            {
+                const image_identity = container_value.image_identity;
+
+                const image_name = table_of_images[ image_identity ].name;
+
+                const scenario_identity = container_value.scenario_identity;
+
+                const scenario_name = table_of_scenarios[ scenario_identity ].name;
+
+                const datetime = new Date( container_value.last_game_timestamp * 1000 );
+
+                const last_game_timestamp = ( datetime.getHours() < 10 ? '0' + datetime.getHours() : datetime.getHours() ) + ':' + ( datetime.getMinutes() < 10 ? '0' + datetime.getMinutes() : datetime.getMinutes() );
+
+                content += '<tr><td>' + image_name + '</td><td>' + scenario_name + '</td><td>' + container_value.number_of_connected_players + '</td><td>' + container_value.last_game_tick + '</td><td>' + last_game_timestamp + '</td><td>' + container_value.service_port_tcp + '</td><td>' + container_value.service_port_udp + '</td></tr>';
+            }
+
+            content += '</table>';
+        }
+
+        if ( /^\/status$/.test( request.url ) )
+        {
+            response.writeHead( 200, { 'Content-Type': 'text/plain' } );
+        }
+
+        if ( /^\/players$/.test( request.url ) )
+        {
+            response.writeHead( 200, { 'Content-Type': 'application/json' } );
+
+            content = '{"players":"0"}';
+        }
+
+        response.end( content );
     }
 
     //-------------------------------------------------
@@ -512,7 +706,7 @@
         {
             // const content = escape_string( message.cleanContent );
 
-            // script.event.trigger( 'script_event_on_container_chat', [ 0, message.author.username, '[Discord] ' + content ] );
+            // script.event.trigger( 'script_event_on_container_chat', [ 0, message.author.username, '0.0.0', '[Discord] ' + content ] );
         }
     }
 
@@ -581,7 +775,10 @@
 
     function human_readable_file_size( bytes, precision = 2 )
     {
-        if ( bytes === 0 ) return '0 Bytes';
+        if ( bytes === 0 )
+        {
+            return '0 Bytes';
+        }
 
         const dm = precision < 0 ? 0 : precision;
 

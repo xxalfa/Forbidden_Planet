@@ -1,0 +1,24 @@
+[Unit]
+Description=Node Factorio Manager
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/xalpha/forbidden_planet
+ExecStart=/usr/bin/env node node-factorio-manager.js
+# Restart=on-failure
+# RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
+
+# sudo nano /etc/systemd/system/node-factorio-manager.service
+# sudo systemctl daemon-reload
+# sudo systemctl enable node-factorio-manager.service
+# sudo systemctl start node-factorio-manager.service
+
+# sudo nano ~/.bash_profile
+# alias webstart='sudo systemctl start web.service'
+# alias webstatus='sudo systemctl status web.service'
+# alias webstop='sudo systemctl stop web.service'
